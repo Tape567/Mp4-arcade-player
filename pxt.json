@@ -1,0 +1,13 @@
+{
+    "name": "pcm-audio-player",
+    "description": "Play short PCM audio clips as sound effects in MakeCode Arcade.",
+    "version": "0.0.1",
+    "dependencies": {},
+    "files": [
+        "custom.ts"
+    ],
+    "testFiles": [],
+    "targetVersions": {
+        "arcade": "1.10.14"
+    }
+}
