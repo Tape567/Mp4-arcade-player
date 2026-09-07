@@ -58,6 +58,10 @@ trim, `--format hex|array`, `--name` for the generated constant, and
   converter script decodes them on your computer instead.
 - Playback is a monophonic re-synthesis, not a faithful reproduction of the
   recording.
+- `playBuffer` takes a `Buffer`, which has no block representation, so it is
+  available in JavaScript only.
+- `stop()` cancels PCM playback, but the mixer has no handle for an individual
+  sound, so silencing what is already queued also stops other game audio.
 
 ## License
 

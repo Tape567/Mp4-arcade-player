@@ -60,6 +60,7 @@ namespace pcmaudio {
     }
 
     let waveform = Waveform.Triangle;
+    let generation = 0;
 
     /**
      * Set the waveform used to re-synthesise PCM samples.
@@ -73,7 +74,7 @@ namespace pcmaudio {
 
     /**
      * Play a PCM sample stored as an array of 8-bit unsigned values (0-255).
-     * @param sample the audio samples, eg: [128, 200, 128, 56]
+     * @param sample the audio samples
      * @param sampleRate samples per second of the recording, eg: 8000
      * @param volume playback volume 0-255, eg: 255
      */
@@ -100,12 +101,7 @@ namespace pcmaudio {
      * @param sampleRate samples per second of the recording, eg: 8000
      * @param volume playback volume 0-255, eg: 255
      */
-    //% blockId=pcmaudio_play_buffer
-    //% block="play PCM buffer $sample || at $sampleRate Hz at volume $volume $mode"
-    //% sampleRate.defl=8000 sampleRate.min=1000 sampleRate.max=44100
-    //% volume.defl=255 volume.min=0 volume.max=255
-    //% expandableArgumentMode="toggle"
-    //% weight=90
+    // Buffers have no block representation, so this one is JavaScript only.
     export function playBuffer(sample: Buffer, sampleRate = 8000, volume = 255, mode = PlaybackMode.UntilDone): void {
         if (!sample || sample.length == 0) return;
         const frames = analyze(sample, Math.max(1000, sampleRate | 0));
@@ -117,11 +113,14 @@ namespace pcmaudio {
     }
 
     /**
-     * Stop any sound that is currently playing.
+     * Stop any PCM playback, including clips playing in the background.
+     * The mixer gives out no handle for an individual sound, so silencing the
+     * instructions that are already queued also stops other game audio.
      */
     //% blockId=pcmaudio_stop block="stop PCM playback"
     //% weight=50
     export function stop(): void {
+        generation++;
         music.stopAllSounds();
     }
 
@@ -132,7 +131,7 @@ namespace pcmaudio {
      */
     function analyze(sample: Buffer, sampleRate: number): Frame[] {
         const frameSamples = Math.max(8, Math.idiv(sampleRate * FRAME_MS, 1000));
-        const frameMs = Math.max(1, Math.idiv(frameSamples * 1000, sampleRate));
+        const frameMs = Math.max(1, Math.idiv(frameSamples * 1000 + Math.idiv(sampleRate, 2), sampleRate));
         const maxHz = Math.min(MAX_HZ, Math.idiv(sampleRate, 2));
         const frames: Frame[] = [];
 
@@ -193,10 +192,12 @@ namespace pcmaudio {
     function playFrames(frames: Frame[], volume: number): void {
         const scale = Math.idiv(Math.clamp(0, 255, volume | 0) * music.volume(), 255);
         const startTime = control.millis();
+        const playing = generation;
         let timePos = 0;
         let index = 0;
 
         while (index < frames.length) {
+            if (generation != playing) return;
             const count = Math.min(CHUNK_FRAMES, frames.length - index);
             // the trailing zero byte terminates the instruction stream
             const buf = control.createBuffer(count * INSTRUCTION_SIZE + 1);
@@ -216,7 +217,7 @@ namespace pcmaudio {
         }
 
         const remaining = timePos - (control.millis() - startTime);
-        if (remaining > 0) pause(remaining);
+        if (remaining > 0 && generation == playing) pause(remaining);
     }
 
     function writeInstruction(buf: Buffer, offset: number, frame: Frame, scale: number): void {
